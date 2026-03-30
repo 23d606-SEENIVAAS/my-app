@@ -1,0 +1,11 @@
+version: "1"
+deploy:
+  steps:
+    - name: Update system
+      run: sudo yum update -y
+
+    - name: Create app directory
+      run: mkdir -p /opt/apps/my-app
+
+    - name: Write hello file
+      run: echo "Hello from Yinatra Deploy!" > /opt/apps/my-app/index.html
