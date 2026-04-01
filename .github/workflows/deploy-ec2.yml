@@ -32,18 +32,18 @@ jobs:
 
       - name: Package artifact
         run: |
-          ARTIFACT_NAME="${PROJECT_NAME}-${GITHUB_SHA:0:7}.tar.gz"
-          tar -czf "$ARTIFACT_NAME" --exclude=.git --exclude="$ARTIFACT_NAME" .
+          ARTIFACT_NAME="my-app-${GITHUB_SHA:0:7}.tar.gz"
+          tar -czf "/tmp/$ARTIFACT_NAME" --exclude=.git .
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
-          echo "ARTIFACT_KEY=artifacts/${PROJECT_NAME}/${ARTIFACT_NAME}" >> $GITHUB_ENV
+          echo "ARTIFACT_KEY=artifacts/my-app/${ARTIFACT_NAME}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::416500109754:role/github-actions-deployer
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ap-south-1
 
       - name: Upload artifact to S3
         run: |
-          aws s3 cp "$ARTIFACT_NAME" "s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
+          aws s3 cp "/tmp/$ARTIFACT_NAME" "s3://yinatra-artifacts-416500109754/$ARTIFACT_KEY"
           echo "Uploaded successfully"
