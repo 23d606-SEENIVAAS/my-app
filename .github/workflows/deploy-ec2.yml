@@ -35,6 +35,7 @@ jobs:
           tar -czf "$ARTIFACT_NAME" \
             --exclude=.git \
             --exclude=.env* \
+            --exclude="$ARTIFACT_NAME" \
             .
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
           echo "ARTIFACT_KEY=artifacts/${PROJECT_NAME}/${ARTIFACT_NAME}" >> $GITHUB_ENV
@@ -49,3 +50,10 @@ jobs:
         run: |
           aws s3 cp "$ARTIFACT_NAME" "s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
           echo "Uploaded: s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
+```
+
+---
+
+## Only one line was added:
+```
+--exclude="$ARTIFACT_NAME" \
