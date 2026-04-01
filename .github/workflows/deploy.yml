@@ -1,25 +1,19 @@
-name: Yinatra Deploy
+name: Deploy
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_type:
+        description: 'Deployment type'
+        required: false
+        default: 'ec2'
+      target_env:
+        description: 'Target environment'
+        required: false
+        default: 'dev'
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
-
-      - name: Notify Yinatra
-        run: |
-          curl -X POST ${{ secrets.YINATRA_WEBHOOK_URL }} \
-            -H "Content-Type: application/json" \
-            -d '{"branch": "main", "project": "my-app"}'
+steps:
+  - name: Deploy
+    run: echo "Deploying..."
