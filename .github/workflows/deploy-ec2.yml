@@ -1,18 +1,19 @@
-name: Build & Deploy to EC2
+name: Build and Deploy to EC2
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       deploy_type:
-        description: 'Deployment type'
+        description: Deployment type
         required: false
-        default: 'ec2'
+        default: ec2
       target_env:
-        description: 'Target environment'
+        description: Target environment
         required: false
-        default: 'dev'
+        default: dev
 
 permissions:
   id-token: write
@@ -21,7 +22,7 @@ permissions:
 env:
   AWS_REGION: ap-south-1
   ARTIFACT_BUCKET: yinatra-artifacts-416500109754
-  PROJECT_NAME: 'my-app'
+  PROJECT_NAME: my-app
 
 jobs:
   build-and-upload:
@@ -32,15 +33,11 @@ jobs:
       - name: Package artifact
         run: |
           ARTIFACT_NAME="${PROJECT_NAME}-${GITHUB_SHA:0:7}.tar.gz"
-          tar -czf "$ARTIFACT_NAME" \
-            --exclude=.git \
-            --exclude=.env* \
-            --exclude="$ARTIFACT_NAME" \
-            .
+          tar -czf "$ARTIFACT_NAME" --exclude=.git --exclude="$ARTIFACT_NAME" .
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
           echo "ARTIFACT_KEY=artifacts/${PROJECT_NAME}/${ARTIFACT_NAME}" >> $GITHUB_ENV
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::416500109754:role/github-actions-deployer
@@ -49,11 +46,4 @@ jobs:
       - name: Upload artifact to S3
         run: |
           aws s3 cp "$ARTIFACT_NAME" "s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
-          echo "Uploaded: s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
-```
-
----
-
-## Only one line was added:
-```
---exclude="$ARTIFACT_NAME" \
+          echo "Uploaded successfully"
