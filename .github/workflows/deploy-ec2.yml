@@ -29,5 +29,6 @@ jobs:
 
       - name: Upload artifact to S3
         run: |
+          aws s3 cp /tmp/artifact/my-app.tar.gz s3://yinatra-artifacts-416500109754/deployments/my-app/${GITHUB_SHA}.tar.gz
           aws s3 cp /tmp/artifact/my-app.tar.gz s3://yinatra-artifacts-416500109754/deployments/my-app/manual.tar.gz
           echo "Uploaded successfully"
