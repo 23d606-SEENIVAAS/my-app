@@ -5,24 +5,10 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      deploy_type:
-        description: Deployment type
-        required: false
-        default: ec2
-      target_env:
-        description: Target environment
-        required: false
-        default: dev
 
 permissions:
   id-token: write
   contents: read
-
-env:
-  AWS_REGION: ap-south-1
-  ARTIFACT_BUCKET: yinatra-artifacts-416500109754
-  PROJECT_NAME: my-app
 
 jobs:
   build-and-upload:
@@ -32,10 +18,8 @@ jobs:
 
       - name: Package artifact
         run: |
-          ARTIFACT_NAME="my-app-${GITHUB_SHA:0:7}.tar.gz"
-          tar -czf "/tmp/$ARTIFACT_NAME" --exclude=.git .
-          echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
-          echo "ARTIFACT_KEY=artifacts/my-app/${ARTIFACT_NAME}" >> $GITHUB_ENV
+          mkdir -p /tmp/artifact
+          tar -czf /tmp/artifact/my-app.tar.gz --exclude=.git .
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -45,5 +29,5 @@ jobs:
 
       - name: Upload artifact to S3
         run: |
-          aws s3 cp "/tmp/$ARTIFACT_NAME" "s3://yinatra-artifacts-416500109754/$ARTIFACT_KEY"
+          aws s3 cp /tmp/artifact/my-app.tar.gz s3://yinatra-artifacts-416500109754/deployments/my-app/manual.tar.gz
           echo "Uploaded successfully"
