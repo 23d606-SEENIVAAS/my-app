@@ -1,22 +1,45 @@
-name: Deploy
+name: Deploy to ECS Fargate
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      deploy_type:
-        description: 'Deployment type'
-        required: false
-        default: 'ec2'
-      target_env:
-        description: 'Target environment'
-        required: false
-        default: 'dev'
+    branches:
+      - main
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: 416500109754.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: my-app
+  ECS_CLUSTER: my-app-cluster
+  ECS_SERVICE: my-app-service
+  CONTAINER_NAME: my-app
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy
-        run: echo "Deploying..."
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::416500109754:role/github-actions-deployer
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to ECR
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Force new ECS deployment
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment \
+            --region $AWS_REGION
