@@ -17,6 +17,7 @@ env:
   ECS_CLUSTER: my-app-cluster
   ECS_SERVICE: my-app-service
   CONTAINER_NAME: my-app
+  GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
 
 jobs:
   deploy:
