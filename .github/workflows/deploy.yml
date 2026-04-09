@@ -3,8 +3,21 @@ name: Deploy to ECS Fargate
 on:
   push:
     branches:
-      - main 
+      - main
   workflow_dispatch:
+    inputs:
+      phase:
+        description: 'Deployment phase'
+        required: false
+        default: 'dev'
+      pipeline_run_id:
+        description: 'Pipeline run ID'
+        required: false
+        default: ''
+      image_tag:
+        description: 'Docker image tag'
+        required: false
+        default: 'latest'
 
 permissions:
   id-token: write
@@ -17,7 +30,6 @@ env:
   ECS_CLUSTER: my-app-cluster
   ECS_SERVICE: my-app-service
   CONTAINER_NAME: my-app
-  GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
 
 jobs:
   deploy:
@@ -39,8 +51,9 @@ jobs:
 
       - name: Build, tag, and push image to ECR
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          IMAGE_TAG=${{ github.event.inputs.image_tag || 'latest' }}
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Force new ECS deployment
         run: |
