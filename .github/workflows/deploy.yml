@@ -1,23 +1,54 @@
-name: Deploy to ECS Fargate
+name: Build & Deploy to ECS Fargate
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
     inputs:
       phase:
-        description: 'Deployment phase'
+        description: 'Phase: build (build+push+deploy) or deploy (deploy existing image only)'
         required: false
-        default: 'dev'
+        default: 'build'
+        type: string
       pipeline_run_id:
-        description: 'Pipeline run ID'
+        description: 'Yinatra pipeline run ID'
         required: false
         default: ''
+        type: string
       image_tag:
-        description: 'Docker image tag'
+        description: 'Docker image tag to build or deploy'
         required: false
-        default: 'latest'
+        default: ''
+        type: string
+      ecs_cluster:
+        description: 'ECS cluster name (Yinatra passes this at dispatch time)'
+        required: false
+        default: ''
+        type: string
+      ecs_service:
+        description: 'ECS service name (Yinatra passes this at dispatch time)'
+        required: false
+        default: ''
+        type: string
+      aws_account_id:
+        description: 'AWS account ID (Yinatra passes this at dispatch time)'
+        required: false
+        default: ''
+        type: string
+      aws_region:
+        description: 'AWS region (Yinatra passes this at dispatch time)'
+        required: false
+        default: ''
+        type: string
+      ecr_repository:
+        description: 'ECR repository name (Yinatra passes this at dispatch time)'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   id-token: write
@@ -25,40 +56,77 @@ permissions:
 
 env:
   AWS_REGION: ap-south-1
-  ECR_REGISTRY: 416500109754.dkr.ecr.ap-south-1.amazonaws.com
+  AWS_ACCOUNT_ID: 416500109754
   ECR_REPOSITORY: my-app
   ECS_CLUSTER: my-app-cluster
   ECS_SERVICE: my-app-service
-  CONTAINER_NAME: my-app
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Apply Yinatra dispatch overrides
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          [ -n "${{ inputs.ecs_cluster }}" ] && echo "ECS_CLUSTER=${{ inputs.ecs_cluster }}" >> $GITHUB_ENV || true
+          [ -n "${{ inputs.ecs_service }}" ] && echo "ECS_SERVICE=${{ inputs.ecs_service }}" >> $GITHUB_ENV || true
+          [ -n "${{ inputs.aws_account_id }}" ] && echo "AWS_ACCOUNT_ID=${{ inputs.aws_account_id }}" >> $GITHUB_ENV || true
+          [ -n "${{ inputs.aws_region }}" ] && echo "AWS_REGION=${{ inputs.aws_region }}" >> $GITHUB_ENV || true
+          [ -n "${{ inputs.ecr_repository }}" ] && echo "ECR_REPOSITORY=${{ inputs.ecr_repository }}" >> $GITHUB_ENV || true
+
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::416500109754:role/github-actions-deployer
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deployer
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image to ECR
+      - name: Set image tag and URI
         run: |
-          IMAGE_TAG=${{ github.event.inputs.image_tag || 'latest' }}
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          TAG="${{ inputs.image_tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="${GITHUB_SHA:0:7}"
+          fi
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+          echo "IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$TAG" >> $GITHUB_ENV
 
-      - name: Force new ECS deployment
+      - name: Build and push Docker image
+        if: ${{ inputs.phase != 'deploy' }}
         run: |
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
+          echo "Pushed: $IMAGE_URI"
+
+      - name: Update ECS task definition and service
+        run: |
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster $ECS_CLUSTER --services $ECS_SERVICE \
+            --query 'services[0].taskDefinition' --output text)
+
+          NEW_TASK=$(aws ecs describe-task-definition --task-definition $TASK_DEF_ARN \
+            --query 'taskDefinition' --output json | \
+            jq --arg IMG "$IMAGE_URI" \
+              'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy) |
+               .containerDefinitions[0].image = $IMG')
+
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK" \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+
           aws ecs update-service \
             --cluster $ECS_CLUSTER \
             --service $ECS_SERVICE \
-            --force-new-deployment \
-            --region $AWS_REGION
+            --task-definition "$NEW_ARN"
+          echo "Updated ECS service to task definition: $NEW_ARN"
+
+      - name: Wait for ECS service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE
+          echo "ECS service is stable"
