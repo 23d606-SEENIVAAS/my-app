@@ -1,0 +1,47 @@
+name: Build and Deploy to Azure VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package artifact
+        run: |
+          mkdir -p /tmp/artifact
+          tar -czf /tmp/artifact/my-app.tar.gz --exclude=.git .
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Upload artifact to Azure Blob Storage
+        run: |
+          az storage blob upload \
+            --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
+            --container-name deployments \
+            --name my-app/${GITHUB_SHA}.tar.gz \
+            --file /tmp/artifact/my-app.tar.gz \
+            --auth-mode login
+
+          az storage blob upload \
+            --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
+            --container-name deployments \
+            --name my-app/manual.tar.gz \
+            --file /tmp/artifact/my-app.tar.gz \
+            --auth-mode login
+
+          echo "Uploaded successfully"
