@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       phase:
-        description: 'Deployment phase (dev/staging/production)'
+        description: 'Deployment phase'
         required: true
         type: string
       pipeline_run_id:
@@ -34,7 +34,10 @@ jobs:
           key: ${{ secrets.AZURE_SSH_KEY }}
           script: |
             cd /opt/project
+            # Pull latest code
             git pull origin main
+            # Stop existing containers
             docker-compose down
+            # Rebuild and start
             docker-compose up -d --build
-            echo "✅ Deployment successful! Phase: ${{ inputs.phase }}, Run: ${{ inputs.pipeline_run_id }}"
+            echo "✅ Deployment successful!"
