@@ -14,10 +14,6 @@ on:
         description: 'Pipeline run identifier'
         required: true
         type: string
-      image_tag:
-        description: 'Docker image tag to deploy'
-        required: true
-        type: string
 
 jobs:
   deploy:
@@ -31,13 +27,10 @@ jobs:
         with:
           host: ${{ secrets.AZURE_VM_HOST }}
           username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_SSH_KEY }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
             cd /opt/project
-            # Pull latest code
             git pull origin main
-            # Stop existing containers
             docker-compose down
-            # Rebuild and start
             docker-compose up -d --build
-            echo "✅ Deployment successful!"
+            echo "✅ Deployment successful! Phase: ${{ inputs.phase }}"
