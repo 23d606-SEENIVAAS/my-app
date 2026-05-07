@@ -27,7 +27,7 @@ jobs:
         with:
           host: ${{ secrets.AZURE_VM_HOST }}
           username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
           script: |
             cd /opt/project
             git pull origin main
