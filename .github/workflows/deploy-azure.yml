@@ -5,11 +5,23 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      phase:
+        description: 'Deployment phase (dev/staging/production)'
+        required: true
+        type: string
+      pipeline_run_id:
+        description: 'Pipeline run identifier'
+        required: true
+        type: string
+      image_tag:
+        description: 'Docker image tag to deploy'
+        required: true
+        type: string
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,14 +34,7 @@ jobs:
           key: ${{ secrets.AZURE_SSH_KEY }}
           script: |
             cd /opt/project
-
-            # Pull latest code
             git pull origin main
-
-            # Stop existing containers
             docker-compose down
-
-            # Rebuild and start
             docker-compose up -d --build
-
-            echo "✅ Deployment successful!"
+            echo "✅ Deployment successful! Phase: ${{ inputs.phase }}, Run: ${{ inputs.pipeline_run_id }}"
